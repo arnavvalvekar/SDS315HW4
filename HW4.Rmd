@@ -1,0 +1,145 @@
+---
+title: "Homework 4"
+author: "Arnav Valvekar - SDS 315 UT Austin"
+date: "2025-02-19"
+output:
+  pdf_document:
+    toc: true
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.height=3, fig.width=4, warning=FALSE, tidy.opts=list(width.cutoff=60))
+
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(boot)
+```
+
+### Link to GitHub Repository: https://github.com/arnavvalvekar/SDS315HW4
+
+## Problem 1 - Iron Bank
+
+The null hypothesis we are testing states that the Iron Bank employees' trading behavior is consistent with the trading behavior of other banks, with the proportion of flagged trades being 2.4%. 
+The test statistics we are using is the number of trades of the last 2021 trades that have been flagged. 70 of the last 2021 trades have been flagged, or `r round((7/2021)*100, 3)`% of the trades.
+To calculate a p-value for this null hypothesis, we will use a Monte Carlo simulation.
+
+```{r echo=FALSE}
+simulated_flag_trades = rbinom(10000, 2021, 0.024)
+trade_p_value = mean(simulated_flag_trades >= 70)
+
+simulated_trade_data = data.frame(flagged_trades = simulated_flag_trades)
+ggplot(simulated_trade_data, aes(x = flagged_trades)) +
+  geom_histogram(fill = "skyblue", color = "black")+
+  labs(
+    title = ("Distribution of Simulated Trades that have been Flagged"),
+    x = "Flagged Trades per 2021 Trades",
+    y = "Frequency"
+  ) +
+  theme_bw() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 8, face = "bold"),
+  )
+```
+
+The distribution of simulated trades that have been flagged out of 2021 trades is normally distributed with a median around 46-48 trades. Additionally, 70 trades seems to be an outlier on this graph, as it is very far to the right.
+The p-value of this simulation was `r trade_p_value`, which is very small.
+Based on the p_value being much smaller than 0.05 and the histogram showing the general distribution of trades, we can reject the null hypothesis and suggest that the trades that Iron Bank employees are making are not consistent with the federal insider trading laws.
+
+## Problem 2 - Health Inspections
+
+The null hypothesis we are testing states that all the restaurants in the city are cited for health code violations at an average rate of 3%.
+The test statistics we are using is the number of times Gourmet Bites had a health code violation during an inspection. 8 of the last 50 inspections fit this criteria, or `r round((8/50)*100, 3)`% of the inspections.
+To calculate a p-value for this null hypothesis, we will use a Monte Carlo simulation.
+
+```{r echo=FALSE}
+health_vio = rbinom(100000, 50, 0.03)
+health_p_value = mean(health_vio >= 8)
+
+simulated_health_data = data.frame(violations = health_vio)
+ggplot(simulated_health_data, aes(x = violations)) +
+  geom_histogram(fill = "skyblue", color = "black")+
+  labs(
+    title = ("Distribution of Simulated Health Code Violations"),
+    x = "Health Code Violations per 50 visits",
+    y = "Frequency"
+  ) +
+  theme_bw() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 8, face = "bold"),
+  )
+```
+
+The distribution of simulated health code violations is skewed to the right with a median around 1-2 violations. Additionally, 8 violations seems to be an outlier on this graph, as it is very far to the right.
+The p-value of this simulation was `r health_p_value`, which is very small.
+Based on the p_value being much smaller than 0.05 and the histogram showing the general distribution of violations, we can reject the null hypothesis and suggest that Gourmet Bites has a higher-than-usual number of health code violation reports.
+
+## Problem 3 - Evaluating Jury Selection for Bias
+
+Our null hypothesis for this problem is that the judge's jury selection is consistent with the county's eligible jury population. To test this hypothesis, we will use the chi-square test statistic, where we divide the square of the observed count minus the expected count by the expected count.
+
+```{r echo=FALSE}
+observed_counts = c(85, 56, 59, 27, 13)
+expected_counts = c(0.3 * 240, 0.25 * 240, 0.2 * 240, 0.15 * 240, 0.1 * 240)
+
+jury_p_value = chisq.test(observed_counts, p = expected_counts / sum(expected_counts))
+jury_p_value
+```
+
+The chi-squared test shows us that we had a test statistic of 12.426, 4 degrees of freedom, and a p-value of 0.01445. As the p-value is less than 0.05, we reject the null hypothesis and suggest that there is systematic bias in the jury selection. This could be due to some of the groups having a clear bias towards a certain way, or the existence of certain aspects common among people within a racial group that cause attorneys to dismiss jurors through peremptory challenges.
+
+## Problem 4 - LLM Watermarking
+
+```{r echo=FALSE}
+brown = readLines("brown_sentences.txt")
+letter_freq = read.csv("letter_frequencies.csv")
+
+process_text = function(text) {
+  test = toupper(gsub("[^A-Z]", "", text))
+  table(unlist(strsplit(test, "")))
+}
+
+brown_letter_frequencies = lapply(brown, process_text)
+english_freq = setNames(letter_freq$Probability, letter_freq$Letter)
+
+compute_chi = function(letter_count, expected_freq) {
+  observed = rep(0,26)
+  names(observed) = LETTERS
+  
+  observed[names(letter_count)] = as.numeric(letter_count)
+  
+  total_letters = sum(observed)
+  expected = total_letters * expected_freq
+  sum((observed - expected)^2 / expected, na.rm = TRUE)
+}
+
+brown_chi_values = sapply(letter_frequencies, compute_chi, expected_freq = english_freq)
+
+test_sentences <- c(
+  "She opened the book and started to read the first chapter, eagerly anticipating what might come next.",
+  "Despite the heavy rain, they decided to go for a long walk in the park, crossing the main avenue by the fountain in the center.",
+  "The museum’s new exhibit features ancient artifacts from various civilizations around the world.",
+  "He carefully examined the document, looking for any clues that might help solve the mystery.",
+  "The students gathered in the auditorium to listen to the guest speaker’s inspiring lecture.",
+  "Feeling vexed after an arduous and zany day at work, she hoped for a peaceful and quiet evening at home, cozying up after a quick dinner with some TV, or maybe a book on her upcoming visit to Auckland.",
+  "The chef demonstrated how to prepare a delicious meal using only locally sourced ingredients, focusing mainly on some excellent dinner recipes from Spain.",
+  "They watched the sunset from the hilltop, marveling at the beautiful array of colors in the sky.",
+  "The committee reviewed the proposal and provided many points of useful feedback to improve the project’s effectiveness.",
+  "Despite the challenges faced during the project, the team worked tirelessly to ensure its successful completion, resulting in a product that exceeded everyone’s expectations."
+)
+
+test_letter_freq = lapply(test_sentences, process_text)
+test_chi_values = sapply(test_letter_freq, compute_chi, expected_freq = english_freq)
+
+p_values = sapply(test_chi_values, function(x) mean(brown_chi_values >= x))
+
+p_table = data.frame(Sentence = 1:10, Chi_Squared = test_chi_values, P_Value = round(p_values, 3))
+p_table
+```
+
+Based on the table and the p_values, we can determine that sentence 6 is most likely generated by an LLM, as it has the lowest p_value out of all of these sentences by a decent amount, indicating it has the strongest deviation from normal English letter distribution due to the watermarking of the LLM. 
+
+
